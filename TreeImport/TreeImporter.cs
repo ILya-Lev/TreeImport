@@ -1,4 +1,3 @@
-using MoreLinq;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,18 +13,18 @@ namespace TreeImport
 			IReadOnlyDictionary<int, Asset> sortedInput = inputData.ToDictionary(a => a.Id);
 			var alreadyProcessed = new ConcurrentDictionary<int, byte>();
 
-			sortedInput.AsParallel().AsOrdered()
-				.Pipe(pair => ProcessSubTree(alreadyProcessed, pair, sortedInput))
+			var answer = sortedInput.AsParallel().AsOrdered()
+				.SelectMany(pair => ProcessSubTree(alreadyProcessed, pair, sortedInput))
 				.ToList();
 
-			return _results;
+			return answer;
 		}
 
-		private void ProcessSubTree (ConcurrentDictionary<int, byte> alreadyProcessed,
-										KeyValuePair<int, Asset> pair,
-										IReadOnlyDictionary<int, Asset> sortedInput)
+		private IEnumerable<Asset> ProcessSubTree (ConcurrentDictionary<int, byte> alreadyProcessed,
+													KeyValuePair<int, Asset> pair,
+													IReadOnlyDictionary<int, Asset> sortedInput)
 		{
-			if (alreadyProcessed.ContainsKey(pair.Key)) return;
+			if (alreadyProcessed.ContainsKey(pair.Key)) yield break;
 
 			var path = new Stack<Asset>();
 			path.Push(pair.Value);
@@ -43,7 +42,7 @@ namespace TreeImport
 
 			while (path.Count > 0)
 			{
-				_results.Add(path.Pop());
+				yield return path.Pop();
 			}
 		}
 	}
