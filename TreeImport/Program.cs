@@ -7,17 +7,16 @@ namespace TreeImport
 {
 	class Program
 	{
-		static void Main (string[] args)
+		static void Main(string[] args)
 		{
-			var inputData = GenerateData(10);
+			var inputData = GenerateData(100000);
 			PrintSequence(inputData);
 
 			var importer = new TreeImporter();
-			var outputData = importer.Process(inputData);
-			PrintSequence(outputData);
+			importer.Process(inputData);
 		}
 
-		private static void PrintSequence (IReadOnlyList<Asset> sequence)
+		private static void PrintSequence(IReadOnlyList<Asset> sequence)
 		{
 			sequence.ForEach(a => Console.Write(a.Id + " "));
 			Console.WriteLine();
@@ -25,7 +24,7 @@ namespace TreeImport
 			Console.WriteLine("\n\n");
 		}
 
-		private static IReadOnlyList<Asset> GenerateData (int amount)
+		private static IReadOnlyList<Asset> GenerateData(int amount)
 		{
 			var random = new Random();
 			return Enumerable.Range(1, amount).Select(n => new Asset

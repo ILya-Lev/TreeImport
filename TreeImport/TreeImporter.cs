@@ -1,49 +1,78 @@
 using MoreLinq;
-using System.Collections.Concurrent;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace TreeImport
 {
 	internal class TreeImporter
 	{
-		private List<Asset> _results;
-		public IReadOnlyList<Asset> Process (IReadOnlyList<Asset> inputData)
+		// asset - level map
+		private Dictionary<int, int> _results;
+
+		public void Process(IReadOnlyList<Asset> inputData)
 		{
-			_results = new List<Asset>();
 			IReadOnlyDictionary<int, Asset> sortedInput = inputData.ToDictionary(a => a.Id);
-			var alreadyProcessed = new ConcurrentDictionary<int, byte>();
+			var leveledItems = SortByLevel(sortedInput);
 
-			sortedInput.AsParallel().AsOrdered()
-				.Pipe(pair => ProcessSubTree(alreadyProcessed, pair, sortedInput))
-				.ToList();
-
-			return _results;
+			foreach (IGrouping<int, Asset> level in leveledItems)
+			{
+				//level.AsParallel().Pipe(a => Console.Write(level.Key + " " + a.Id + " " + a.ParentId))
+				//	.ToList();
+				Parallel.ForEach(level, a => Console.WriteLine($"{level.Key} {a.Id} {a.ParentId}"));
+			}
 		}
 
-		private void ProcessSubTree (ConcurrentDictionary<int, byte> alreadyProcessed,
-										KeyValuePair<int, Asset> pair,
-										IReadOnlyDictionary<int, Asset> sortedInput)
+		private List<IGrouping<int, Asset>> SortByLevel(IReadOnlyDictionary<int, Asset> sortedInput)
 		{
-			if (alreadyProcessed.ContainsKey(pair.Key)) return;
+			_results = new Dictionary<int, int>();
+
+			var alreadyProcessed = new HashSet<int>();
+
+			sortedInput.Pipe(pair => ProcessSubTree(alreadyProcessed, pair, sortedInput)).ToList();
+
+			return _results.Select(pair => new
+			{
+				Level = pair.Value,
+				Asset = sortedInput[pair.Key]
+			})
+							.GroupBy(item => item.Level, item => item.Asset)
+							.ToList();
+		}
+
+		private void ProcessSubTree(HashSet<int> alreadyProcessed,
+									KeyValuePair<int, Asset> pair,
+									IReadOnlyDictionary<int, Asset> sortedInput)
+		{
+			if (alreadyProcessed.Contains(pair.Key)) return;
+			alreadyProcessed.Add(pair.Key);
 
 			var path = new Stack<Asset>();
 			path.Push(pair.Value);
 
 			var currentParent = pair.Value.ParentId;
-			while (currentParent != 0 && !alreadyProcessed.ContainsKey(currentParent))
+			while (currentParent != 0 && !alreadyProcessed.Contains(currentParent))
 			{
 				if (!sortedInput.ContainsKey(currentParent))
 					break;
-				if (!alreadyProcessed.TryAdd(currentParent, 1))
-					break;
-				path.Push(sortedInput[currentParent]);
-				currentParent = path.Peek().ParentId;
+				alreadyProcessed.Add(currentParent);
+
+				var parentAsset = sortedInput[currentParent];
+				path.Push(parentAsset);
+
+				currentParent = parentAsset.ParentId;
 			}
 
+			var level = 0;
 			while (path.Count > 0)
 			{
-				_results.Add(path.Pop());
+				var asset = path.Pop();
+				if (_results.ContainsKey(asset.ParentId))
+					level = _results[asset.ParentId] + 1;
+
+				//if (!_results.ContainsKey(asset.Id))
+				_results.Add(asset.Id, level++);
 			}
 		}
 	}
