@@ -2,7 +2,7 @@
 
 namespace TreeImport
 {
-	class Asset
+	public class Asset
 	{
 		public int Id { get; set; }
 		public int ParentId { get; set; }

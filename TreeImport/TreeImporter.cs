@@ -7,13 +7,15 @@ using System.Threading.Tasks;
 
 namespace TreeImport
 {
-	internal class TreeImporter
+	public class TreeImporter
 	{
 		// asset - level map
 		private Dictionary<int, int> _results;
+		public List<Asset> _output;
 
-		public void Process(IReadOnlyList<Asset> inputData)
+		public List<Asset> Process(IReadOnlyList<Asset> inputData)
 		{
+			_output = new List<Asset>();
 			IReadOnlyDictionary<int, Asset> sortedInput = inputData.ToDictionary(a => a.Id);
 
 			foreach (var pair in sortedInput)
@@ -24,6 +26,8 @@ namespace TreeImport
 
 			var roots = FindRoots(sortedInput).ToList();
 			ImportTrees(roots, sortedInput);
+
+			return _output;
 		}
 
 		private static IEnumerable<Asset> FindRoots(IReadOnlyDictionary<int, Asset> sortedInput)
@@ -42,16 +46,14 @@ namespace TreeImport
 		/// <param name="sortedInput"></param>
 		private void ImportTrees(IReadOnlyList<Asset> roots, IReadOnlyDictionary<int, Asset> sortedInput)
 		{
-			Semaphore semaphore = new Semaphore(0, 15);
+			Semaphore semaphore = new Semaphore(15, 15);
 			var parentSynchronizedEvent = new ManualResetEvent(false);
 
 			var availableNodesToSync = new ConcurrentBag<Asset>(roots);
 			List<Task> threads = new List<Task>();
-			int processedNodes = 0;
-			do
-			{
-				semaphore.Release();
 
+			for (int processedNodes = 0; processedNodes < sortedInput.Count;)
+			{
 				Asset nodeToSync = null;
 				if (!availableNodesToSync.TryTake(out nodeToSync))
 				{
@@ -64,6 +66,7 @@ namespace TreeImport
 					continue;
 				}
 
+				semaphore.WaitOne();
 				var aTask = Task.Factory.StartNew(() =>
 				{
 					try
@@ -79,19 +82,20 @@ namespace TreeImport
 						parentSynchronizedEvent.Set();
 					}
 				});
-
-				threads.Add(aTask);
-
 				processedNodes++;
-
-			} while (processedNodes != sortedInput.Count);
+				threads.Add(aTask);
+			}
 
 			Task.WaitAll(threads.ToArray());
 		}
 
 		private void SynchronizeNode(Asset nodeToSync)
 		{
-			throw new System.NotImplementedException();
+			lock (_output)
+			{
+				Thread.Sleep(1000);
+				_output.Add(nodeToSync);
+			}
 		}
 
 		private List<IGrouping<int, Asset>> SortByLevel(IReadOnlyDictionary<int, Asset> sortedInput)
