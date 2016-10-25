@@ -9,7 +9,7 @@ namespace TreeImport
 	{
 		static void Main(string[] args)
 		{
-			var inputData = GenerateData(100000);
+			var inputData = GenerateData(20);
 			PrintSequence(inputData);
 
 			var importer = new TreeImporter();

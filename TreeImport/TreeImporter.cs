@@ -1,7 +1,8 @@
 using MoreLinq;
-using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace TreeImport
@@ -14,14 +15,83 @@ namespace TreeImport
 		public void Process(IReadOnlyList<Asset> inputData)
 		{
 			IReadOnlyDictionary<int, Asset> sortedInput = inputData.ToDictionary(a => a.Id);
-			var leveledItems = SortByLevel(sortedInput);
 
-			foreach (IGrouping<int, Asset> level in leveledItems)
+			foreach (var pair in sortedInput)
 			{
-				//level.AsParallel().Pipe(a => Console.Write(level.Key + " " + a.Id + " " + a.ParentId))
-				//	.ToList();
-				Parallel.ForEach(level, a => Console.WriteLine($"{level.Key} {a.Id} {a.ParentId}"));
+				if (sortedInput.ContainsKey(pair.Value.ParentId))
+					sortedInput[pair.Value.ParentId].ChildAssets.Add(pair.Value);
 			}
+
+			var roots = FindRoots(sortedInput).ToList();
+			ImportTrees(roots, sortedInput);
+		}
+
+		private static IEnumerable<Asset> FindRoots(IReadOnlyDictionary<int, Asset> sortedInput)
+		{
+			foreach (var pair in sortedInput)
+			{
+				if (!sortedInput.ContainsKey(pair.Value.ParentId))
+					yield return pair.Value;
+			}
+		}
+
+		/// <summary>
+		/// Sergey's solution with some small changes from my side
+		/// </summary>
+		/// <param name="roots"></param>
+		/// <param name="sortedInput"></param>
+		private void ImportTrees(IReadOnlyList<Asset> roots, IReadOnlyDictionary<int, Asset> sortedInput)
+		{
+			Semaphore semaphore = new Semaphore(0, 15);
+			var parentSynchronizedEvent = new ManualResetEvent(false);
+
+			var availableNodesToSync = new ConcurrentBag<Asset>(roots);
+			List<Task> threads = new List<Task>();
+			int processedNodes = 0;
+			do
+			{
+				semaphore.Release();
+
+				Asset nodeToSync = null;
+				if (!availableNodesToSync.TryTake(out nodeToSync))
+				{
+					parentSynchronizedEvent.WaitOne();
+					parentSynchronizedEvent.Reset();
+				}
+
+				if (nodeToSync == null)
+				{
+					continue;
+				}
+
+				var aTask = Task.Factory.StartNew(() =>
+				{
+					try
+					{
+						SynchronizeNode(nodeToSync);
+					}
+					finally
+					{
+						//add synchronized asset children to asset processing
+						nodeToSync.ChildAssets.ForEach(c => availableNodesToSync.Add(c));
+						semaphore.Release();
+						//setting event to release waiting asset
+						parentSynchronizedEvent.Set();
+					}
+				});
+
+				threads.Add(aTask);
+
+				processedNodes++;
+
+			} while (processedNodes != sortedInput.Count);
+
+			Task.WaitAll(threads.ToArray());
+		}
+
+		private void SynchronizeNode(Asset nodeToSync)
+		{
+			throw new System.NotImplementedException();
 		}
 
 		private List<IGrouping<int, Asset>> SortByLevel(IReadOnlyDictionary<int, Asset> sortedInput)
