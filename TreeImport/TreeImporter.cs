@@ -21,7 +21,7 @@ namespace TreeImport
 
 		private void SynchronizeNode(Asset nodeToSync)
 		{
-			Thread.Sleep(1000);
+			Thread.Sleep(100);
 			lock (_output)
 			{
 				_output.Add(nodeToSync);

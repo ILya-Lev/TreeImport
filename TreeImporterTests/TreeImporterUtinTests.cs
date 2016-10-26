@@ -108,28 +108,28 @@ namespace TreeImporterTests
 			//assert
 			StandardCheck(outputData, inputData);
 		}
-		//[TestMethod]
-		//public void Process_RandomTreeOf10_ShouldGenerateProperOutput()
-		//{
-		//	//acquire
-		//	IReadOnlyList<Asset> inputData = GenerateData(10);
-		//	var importer = new TreeImporter();
-		//	//act
-		//	var outputData = importer.Process(inputData);
-		//	//assert
-		//	StandardCheck(outputData, inputData);
-		//}
-		//[TestMethod]
-		//public void Process_RandomTreeOf1000_ShouldGenerateProperOutput()
-		//{
-		//	//acquire
-		//	IReadOnlyList<Asset> inputData = GenerateData(1000);
-		//	var importer = new TreeImporter();
-		//	//act
-		//	var outputData = importer.Process(inputData);
-		//	//assert
-		//	StandardCheck(outputData, inputData);
-		//}
+		[TestMethod]
+		public void Process_RandomTreeOf10_ShouldGenerateProperOutput()
+		{
+			//acquire
+			IReadOnlyList<Asset> inputData = GenerateData(10);
+			var importer = new TreeImporter();
+			//act
+			var outputData = importer.Process(inputData);
+			//assert
+			StandardCheck(outputData, inputData);
+		}
+		[TestMethod]
+		public void Process_RandomTreeOf1000_ShouldGenerateProperOutput()
+		{
+			//acquire
+			IReadOnlyList<Asset> inputData = GenerateData(10000);
+			var importer = new TreeImporter();
+			//act
+			var outputData = importer.Process(inputData);
+			//assert
+			StandardCheck(outputData, inputData);
+		}
 
 		private static void StandardCheck(List<Asset> outputData, IReadOnlyList<Asset> inputData)
 		{
@@ -146,13 +146,33 @@ namespace TreeImporterTests
 		private static IReadOnlyList<Asset> GenerateData(int amount)
 		{
 			var random = new Random();
-			return Enumerable.Range(1, amount).Select(n => new Asset
+			var tree = Enumerable.Range(1, amount).Select(n => new Asset
 			{
 				Id = n,
 				ParentId = random.Next(amount)
 
 			}).Pipe(a => { if (a.Id == a.ParentId) a.ParentId--; })
 			.ToList();
+
+			var checkedItems = new HashSet<int>();
+			foreach (var asset in tree)
+			{
+				if (checkedItems.Contains(asset.Id)) continue;
+
+				checkedItems.Add(asset.Id);
+				var parent = tree.FirstOrDefault(a => a.Id == asset.ParentId);
+				while (parent != null)
+				{
+					checkedItems.Add(parent.Id);
+					if (checkedItems.Contains(parent.ParentId))
+					{
+						parent.ParentId = 0;
+						break;
+					}
+					parent = tree.FirstOrDefault(a => a.Id == parent.ParentId);
+				}
+			}
+			return tree;
 		}
 	}
 
