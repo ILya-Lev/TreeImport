@@ -51,6 +51,8 @@
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="TreeImporter.cs" />
+    <Compile Include="TreeIterator.cs" />
+    <Compile Include="TreeParallelProcessor.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
