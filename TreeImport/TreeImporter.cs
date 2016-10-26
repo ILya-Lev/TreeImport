@@ -9,10 +9,9 @@ namespace TreeImport
 		public List<Asset> Process(IReadOnlyList<Asset> inputData)
 		{
 			ThreadPool.SetMinThreads(200, 200);
-			var iterator = new TreeIterator<Asset, int>(
-											asset => asset.Id,
-											asset => asset.ParentId,
-											inputData);
+			var iterator = new TreeIterator(nodes: inputData,
+								  idGenerator: a => a.Id,
+							parentIdGenerator: a => a.ParentId);
 
 			TreeParallelProcessor.Process(iterator, SynchronizeNode, 15);
 

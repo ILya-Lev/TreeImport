@@ -9,9 +9,7 @@ namespace TreeImport
 	/// </summary>
 	public class TreeParallelProcessor
 	{
-		public static void Process<TNodeType, TKey>(TreeIterator<TNodeType, TKey> iterator,
-			Action<TNodeType> process,
-			int threadsCount)
+		public static void Process(TreeIterator iterator, Action<Asset> process, int threadsCount)
 		{
 			var finishedEvent = new ManualResetEvent(false);
 			int toProcessCount = iterator.Count;

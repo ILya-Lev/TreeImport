@@ -123,7 +123,7 @@ namespace TreeImporterTests
 		public void Process_RandomTreeOf1000_ShouldGenerateProperOutput()
 		{
 			//acquire
-			IReadOnlyList<Asset> inputData = GenerateData(10000);
+			IReadOnlyList<Asset> inputData = GenerateData(1000);
 			var importer = new TreeImporter();
 			//act
 			var outputData = importer.Process(inputData);

@@ -10,35 +10,31 @@ namespace TreeImport
 	/// Returns Tree nodes and their children after 
 	/// parent processing(when OnNodeProcessingCompleted - thread safe method)
 	/// </summary>
-	/// <typeparam name="TNodeType"></typeparam>
-	/// <typeparam name="TKey"></typeparam>
-	public class TreeIterator<TNodeType, TKey>
+	/// <typeparam name="Asset"></typeparam>
+	public class TreeIterator
 	{
-		private readonly Func<TNodeType, TKey> _getId;
-		private readonly Func<TNodeType, TKey> _getParentId;
-		private readonly IReadOnlyDictionary<TKey, TNodeType> _nodesDictionary;
-
-		private ConcurrentBag<TNodeType> _nodesAvailableForProcessing;
+		private readonly IReadOnlyDictionary<int, Asset> _nodesDictionary;
+		private ConcurrentBag<Asset> _nodesAvailableForProcessing;
 		private readonly ManualResetEvent _nodeProcessedEvent = new ManualResetEvent(false);
-
-
-		public TreeIterator(Func<TNodeType, TKey> getId,
-			Func<TNodeType, TKey> getParentId,
-			IEnumerable<TNodeType> nodes)
-		{
-			_getId = getId;
-			_getParentId = getParentId;
-			_nodesDictionary = nodes.ToDictionary(getId);
-			Count = _nodesDictionary.Count;
-		}
 
 		public int Count { get; set; }
 
-		public IEnumerable<TNodeType> GetNodesToSync()
+		public TreeIterator(IEnumerable<Asset> nodes,
+							Func<Asset, int> idGenerator,
+							Func<Asset, int> parentIdGenerator)
+		{
+			_nodesDictionary = nodes.ToDictionary(idGenerator);
+
+			FillInChildren();
+
+			Count = _nodesDictionary.Count;
+		}
+
+		public IEnumerable<Asset> GetNodesToSync()
 		{
 			int processed = 0;
 
-			_nodesAvailableForProcessing = new ConcurrentBag<TNodeType>();
+			_nodesAvailableForProcessing = new ConcurrentBag<Asset>();
 			var roots = GetRoots();
 			foreach (var node in roots)
 			{
@@ -48,7 +44,7 @@ namespace TreeImport
 
 			while (processed != Count)
 			{
-				TNodeType nodeToSync;
+				Asset nodeToSync;
 				if (!_nodesAvailableForProcessing.TryTake(out nodeToSync))
 				{
 					_nodeProcessedEvent.WaitOne();
@@ -60,24 +56,26 @@ namespace TreeImport
 			}
 		}
 
-		public void OnNodeProcessingCompleted(TNodeType node)
+		public void OnNodeProcessingCompleted(Asset entity)
 		{
-			var parentId = _getId(node);
-			var childNodes = _nodesDictionary.Values.Where(n => _getParentId(n).Equals(parentId));
-			foreach (var childNode in childNodes)
+			foreach (var childNode in entity.ChildAssets)
 			{
 				_nodesAvailableForProcessing.Add(childNode);
 			}
 			_nodeProcessedEvent.Set();
 		}
-		private IEnumerable<TNodeType> GetRoots()
+
+		private IEnumerable<Asset> GetRoots()
+		{
+			return _nodesDictionary.Values.Where(node => !_nodesDictionary.ContainsKey(node.ParentId));
+		}
+
+		private void FillInChildren()
 		{
 			foreach (var node in _nodesDictionary.Values)
 			{
-				if (!_nodesDictionary.ContainsKey(_getParentId(node)))
-				{
-					yield return node;
-				}
+				if (_nodesDictionary.ContainsKey(node.ParentId))
+					_nodesDictionary[node.ParentId].ChildAssets.Add(node);
 			}
 		}
 	}
